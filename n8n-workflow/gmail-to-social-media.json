@@ -1,0 +1,389 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "jsCode": "const content = $input.item.json.text;\n\n// Split newsletter into sections using common markers\nconst sections = content.split(/-{6,}|#{6,}/g);\n\n// Helper: clean text\nfunction cleanText(text) {\n    return text\n        .replace(/\\n{2,}/g, '\\n')\n        .replace(/\\*\\*/g, '')\n        .trim();\n}\n\n// Helper: extract all [title](link) pairs in section with their description\nfunction extractItemsFromSection(section) {\n    const items = [];\n    const lines = section.split('\\n');\n    let currentTitle = null;\n    let currentLink = null;\n    let currentDesc = [];\n\n    lines.forEach(line => {\n        // Detect a markdown link [title](link)\n        const match = line.match(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/);\n        if (match) {\n            // Save previous item if exists\n            if (currentTitle) {\n                items.push({\n                    title: currentTitle,\n                    link: currentLink,\n                    description: cleanText(currentDesc.join(' '))\n                });\n            }\n            // Start a new item\n            currentTitle = match[1].trim();\n            currentLink = match[2].trim();\n            currentDesc = [line.replace(match[0], '').trim()];\n        } else if (currentTitle) {\n            currentDesc.push(line.trim());\n        }\n    });\n\n    // Push the last item\n    if (currentTitle) {\n        items.push({\n            title: currentTitle,\n            link: currentLink,\n            description: cleanText(currentDesc.join(' '))\n        });\n    }\n\n    return items;\n}\n\n// Process each section\nlet output = [];\nsections.forEach(section => {\n    const text = cleanText(section);\n    if (!text) return;\n\n    const items = extractItemsFromSection(text);\n    items.forEach(i => {\n        output.push({\n            date: new Date().toISOString(),\n            title: i.title,\n            description: i.description,\n            link: i.link\n        });\n    });\n});\n\nreturn output.map(i => ({ json: i }));\n"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                7328,
+                2384
+            ],
+            "id": "2836611f-0e9b-4a62-805e-22754c3ad8ef",
+            "name": "Code in JavaScript2"
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "=CONTENT INPUT:\nTitle: {{ $json.title }}\nDescription: {{ $json.description }}\nLink: {{ $json.link }}\nSource Date: {{ $json.date }}\n\nTASK:\nCreate 1 LinkedIn post and 1 Twitter post based on the above content.\nFollow the system rules strictly.",
+                "hasOutputParser": true,
+                "needsFallback": true,
+                "options": {
+                    "systemMessage": "=You are a world-class Social Media Strategist and Copywriter with a history of writing viral content. Your goal is to transform technical news/articles into high-performing, engaging posts.\n\nSTRICT WRITING RULES:\n1. NO Meta-Talk: Never say \"Here is the post\" or \"Sure!\". Just output the content.\n2. NO Labels: Do not include \"Title:\", \"Subject:\", or \"Headline:\" in the post text.\n3. NO Markdown abuse: Do NOT bold the entire post. Use bolding (*) only for 1-2 keywords for emphasis.\n4. Voice: Professional, punchy, and conversational. Avoid \"Save this post!\" or generic engagement bait.\n5. Formatting:\n   - LinkedIn: Use short paragraphs (1-2 sentences). Use bullet points for lists. Add a \"Takeaway\" or \"Pro Tip\".\n   - Twitter: Keep it under 280 characters if possible. Use a strong hook/question.\n6. Hashtags: Use 2-3 relevant hashtags at the bottom. Do NOT use generic ones like #Tech."
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 2.2,
+            "position": [
+                7552,
+                2384
+            ],
+            "id": "475c4c0b-f0e5-4050-ae76-7f6fb175e9d5",
+            "name": "AI Agent1",
+            "retryOnFail": true
+        },
+        {
+            "parameters": {
+                "pollTimes": {
+                    "item": [
+                        {}
+                    ]
+                },
+                "simple": false,
+                "filters": {
+                    "includeDrafts": true,
+                    "readStatus": "both",
+                    "sender": "hi@mail.theresanaiforthat.com "
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.gmailTrigger",
+            "typeVersion": 1.3,
+            "position": [
+                6368,
+                2384
+            ],
+            "id": "0140d9da-9307-46ac-8815-1f13a85a314d",
+            "name": "Gmail Trigger",
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "e87qHc7R9K7u7B8M",
+                    "name": "Gmail account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "b63accb0-59cc-4753-9869-0b0c94e63a56",
+                            "name": "text",
+                            "value": "={{ $json.text }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                7008,
+                2384
+            ],
+            "id": "0179b45d-78e9-4571-ae73-b5f690bbfaf7",
+            "name": "Edit Fields"
+        },
+        {
+            "parameters": {
+                "operation": "get",
+                "messageId": "={{ $json.id }}",
+                "simple": false,
+                "options": {}
+            },
+            "type": "n8n-nodes-base.gmail",
+            "typeVersion": 2.1,
+            "position": [
+                6736,
+                2384
+            ],
+            "id": "7f40f3c1-fc33-456c-856c-0e9a33820994",
+            "name": "Get a message",
+            "webhookId": "9ad07485-3fc1-4397-b171-71d78ea4cc75",
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "e87qHc7R9K7u7B8M",
+                    "name": "Gmail account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "schemaType": "manual",
+                "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"Twitter\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"post_text\": {\n          \"type\": \"string\",\n          \"description\": \"The complete tweet content, including hashtags. NO labels like 'Tweet:'.\"\n        }\n      },\n      \"required\": [\"post_text\"]\n    },\n    \"LinkedIn\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"post_text\": {\n          \"type\": \"string\",\n          \"description\": \"The complete LinkedIn post content, including hashtags. NO labels like 'Post:'.\"\n        }\n      },\n      \"required\": [\"post_text\"]\n    }\n  },\n  \"required\": [\"Twitter\", \"LinkedIn\"]\n}",
+                "autoFix": true
+            },
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.3,
+            "position": [
+                7728,
+                2544
+            ],
+            "id": "adaf71dc-2bdb-465f-a7ad-e9fb037f0044",
+            "name": "Structured Output Parser"
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                7600,
+                2528
+            ],
+            "id": "39f6c5d6-318f-4b5f-b129-3c6ece8b1a38",
+            "name": "Google Gemini Chat Model",
+            "credentials": {
+                "googlePalmApi": {
+                    "id": "ATVPXj8zve95aL7r",
+                    "name": "Google Gemini(PaLM) Api account 2"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                7744,
+                2672
+            ],
+            "id": "bab2a48b-d5cf-427d-8024-c0c2fe32aff5",
+            "name": "Google Gemini Chat Model1",
+            "credentials": {
+                "googlePalmApi": {
+                    "id": "ATVPXj8zve95aL7r",
+                    "name": "Google Gemini(PaLM) Api account 2"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+            "typeVersion": 1,
+            "position": [
+                7488,
+                2544
+            ],
+            "id": "340c7d75-5b1d-4edf-81d9-31d23a3dfa05",
+            "name": "Mistral Cloud Chat Model",
+            "credentials": {
+                "mistralCloudApi": {
+                    "id": "zr29lCYf5yT0gzQ9",
+                    "name": "Mistral Cloud account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "4184eafb-39e7-403a-b0b7-f99513cb0d20",
+                            "name": "date",
+                            "value": "={{ $('Code in JavaScript2').item.json.date }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "cee6d294-0b33-402b-98fd-23928ce76ae5",
+                            "name": "title",
+                            "value": "={{ $('Code in JavaScript2').item.json.title }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "57748a65-e631-40ef-bb26-931d384e954c",
+                            "name": "linkdin",
+                            "value": "={{ $json.output.LinkedIn }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "5a595434-51e0-41ba-b0b1-012e5716406a",
+                            "name": "twitter",
+                            "value": "={{ $json.output.Twitter }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "ff7e90a3-104a-4222-b232-c0640e59e440",
+                            "name": "instagram",
+                            "value": "={{ $json.output.Instagram }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "1122f9f4-0997-4f55-aa23-af3258ed3d96",
+                            "name": "reddit",
+                            "value": "={{ $json.output.Reddit }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "feec4c40-4ef2-43d9-97f6-ac6438842e1e",
+                            "name": "discord",
+                            "value": "={{ $json.output.Discord }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                7984,
+                2384
+            ],
+            "id": "032c3b52-cd2a-490d-b304-73197569ea24",
+            "name": "Edit Fields5"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://host.docker.internal:8000/queue",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "twitter_text",
+                            "value": "={{ $json.twitter }}"
+                        },
+                        {
+                            "name": "linkedin_text",
+                            "value": "={{ $json.linkdin }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.3,
+            "position": [
+                8304,
+                2384
+            ],
+            "id": "818fe459-0204-454c-b227-f2e4b8e260b2",
+            "name": "HTTP Request2"
+        }
+    ],
+    "connections": {
+        "Code in JavaScript2": {
+            "main": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Agent1": {
+            "main": [
+                [
+                    {
+                        "node": "Edit Fields5",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gmail Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Get a message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Edit Fields": {
+            "main": [
+                [
+                    {
+                        "node": "Code in JavaScript2",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get a message": {
+            "main": [
+                [
+                    {
+                        "node": "Edit Fields",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Structured Output Parser": {
+            "ai_outputParser": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_outputParser",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Gemini Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_languageModel",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Google Gemini Chat Model1": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Structured Output Parser",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mistral Cloud Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent1",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Edit Fields5": {
+            "main": [
+                [
+                    {
+                        "node": "HTTP Request2",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "a92a0e682e1f32f3dcbe824de021f6e836ac4236b7cbcc62a37f12d9fba996a5"
+    }
+}
