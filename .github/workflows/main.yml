@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # The API Server
+  api:
+    build: .
+    container_name: social-automation-api
+    command: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  # The Background Timer/Scheduler
+  scheduler:
+    build: .
+    container_name: social-automation-scheduler
+    command: python timer_post.py start
+    volumes:
+      - .:/app
+    environment:
+      # Use the internal docker service name to talk to the API
+      - POST_API_URL=http://api:8000/post
+      - POSTING_INTERVAL_MINUTES=5
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - api
+    restart: unless-stopped
